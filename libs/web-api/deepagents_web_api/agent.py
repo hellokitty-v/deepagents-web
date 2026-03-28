@@ -266,14 +266,33 @@ def _message_to_dict(msg: Any) -> dict[str, Any]:
         msg: LangChain message object.
 
     Returns:
-        Message as dict.
+        Message as dict with 'type' field for frontend compatibility.
     """
+    from langchain_core.messages import ToolMessage
+
     if isinstance(msg, HumanMessage):
-        return {"role": "user", "content": msg.content}
+        return {"type": "human", "content": msg.content}
     elif isinstance(msg, AIMessage):
-        return {"role": "assistant", "content": msg.content}
+        # Extract text content if it's a list of blocks
+        content = msg.content
+        if isinstance(content, list):
+            content = "".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            )
+        result = {"type": "ai", "content": content}
+        if msg.tool_calls:
+            result["tool_calls"] = msg.tool_calls
+        return result
+    elif isinstance(msg, ToolMessage):
+        return {
+            "type": "tool",
+            "content": msg.content,
+            "tool_call_id": msg.tool_call_id,
+            "tool_name": msg.name,
+        }
     else:
-        return {"role": "system", "content": str(msg.content)}
+        return {"type": "system", "content": str(msg.content)}
 
 
 async def delete_session(
