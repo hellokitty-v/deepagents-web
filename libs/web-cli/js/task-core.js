@@ -200,14 +200,16 @@ function sandboxOnToolResult(name, data) {
             var filePath = pathMatch[1];
             var fname = filePath.split('/').pop();
 
-            // Update file tree
-            if (!_sandboxFiles.find(function(f) { return f.name === fname; })) {
-                var ext = fname.split('.').pop();
-                var iconMap = { py: 'file-code', js: 'file-code', html: 'file-code', css: 'file-code',
-                               md: 'file-alt', txt: 'file-alt', json: 'file-code', pptx: 'file-powerpoint' };
-                _sandboxFiles.push({ name: fname, icon: iconMap[ext] || 'file' });
-                sandboxState.files = _sandboxFiles;
-                renderFileTree();
+            // Refresh file tree from API
+            if (currentThreadId) {
+                fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files')
+                    .then(function(r) { return r.json(); })
+                    .then(function(result) {
+                        _sandboxFiles = buildFileTree(result.files);
+                        sandboxState.files = _sandboxFiles;
+                        renderFileTree();
+                    })
+                    .catch(function(e) { console.error('[Sandbox] Failed to refresh file tree:', e); });
             }
 
             // Load and display file content
@@ -244,6 +246,7 @@ function loadFileContent(filename) {
     fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files')
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            // Match by name (filename only, not full path)
             var file = result.files.find(function(f) { return f.name === filename; });
             if (file) {
                 console.log('[Sandbox] Found file:', file.file_id);
@@ -263,6 +266,70 @@ function loadFileContent(filename) {
             console.error('[Sandbox] Failed to load file:', e);
             setEditorContent([{ text: '// 加载文件失败: ' + e.message }]);
         });
+}
+
+/* Build file tree from flat file list */
+function buildFileTree(files) {
+    var tree = [];
+    var iconMap = {
+        py: 'file-code', js: 'file-code', html: 'file-code', css: 'file-code',
+        md: 'file-alt', txt: 'file-alt', json: 'file-code', pptx: 'file-powerpoint'
+    };
+
+    // Group files by directory
+    var dirs = {};
+    files.forEach(function(file) {
+        var path = file.path || file.name;
+        var parts = path.split(/[\/\\]/);
+
+        if (parts.length === 1) {
+            // Root level file
+            var ext = file.name.split('.').pop();
+            tree.push({
+                name: file.name,
+                path: path,
+                icon: iconMap[ext] || 'file',
+                indent: 0,
+                dir: false
+            });
+        } else {
+            // File in subdirectory
+            var dirPath = parts.slice(0, -1).join('/');
+            if (!dirs[dirPath]) {
+                dirs[dirPath] = [];
+            }
+            dirs[dirPath].push(file);
+        }
+    });
+
+    // Add directories and their files
+    Object.keys(dirs).sort().forEach(function(dirPath) {
+        var dirParts = dirPath.split('/');
+        var indent = dirParts.length - 1;
+
+        // Add directory entry
+        tree.push({
+            name: dirParts[dirParts.length - 1],
+            path: dirPath,
+            icon: 'folder',
+            indent: indent,
+            dir: true
+        });
+
+        // Add files in this directory
+        dirs[dirPath].forEach(function(file) {
+            var ext = file.name.split('.').pop();
+            tree.push({
+                name: file.name,
+                path: file.path,
+                icon: iconMap[ext] || 'file',
+                indent: indent + 1,
+                dir: false
+            });
+        });
+    });
+
+    return tree;
 }
 
 /* 创建 SSE 回调对象（复用于 startTask / sendFollowUp / resumeTask） */
