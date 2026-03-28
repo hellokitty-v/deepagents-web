@@ -71,8 +71,16 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .step-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.step-item-inline.active .step-text { color: var(--primary-color); font-weight: 500; }
 .step-detail { margin-left: 4px; color: var(--text-tertiary, #999); font-size: 12px; font-family: monospace; }
+/* 流式文本输入中的闪烁光标 */
 .agent-text-stream { white-space: pre-wrap; }
+.agent-text-stream:not([data-closed])::after {
+    content: ''; display: inline-block; width: 2px; height: 1em;
+    background: var(--primary-color); margin-left: 2px; vertical-align: text-bottom;
+    animation: blink 0.8s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
 .agent-text-stream.markdown-body { white-space: normal; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 12px 0 8px; font-size: 15px; font-weight: 600; }
 .markdown-body h1 { font-size: 17px; }

@@ -88,10 +88,14 @@ function getToolDisplay(name, args) {
 }
 
 function addToolStep(container, name, args) {
+    // Remove active from previous steps
+    container.querySelectorAll('.step-item-inline.active').forEach(function(el) {
+        el.classList.remove('active');
+    });
     var t = getToolDisplay(name, args);
     var detail = t.detail ? '<span class="step-detail">' + t.detail + '</span>' : '';
     var s = document.createElement('div');
-    s.className = 'step-item-inline';
+    s.className = 'step-item-inline active';
     s.innerHTML = '<div class="step-icon loading"></div>' +
         '<div class="step-text"><i class="fas fa-' + t.icon + '" style="margin-right:6px;color:var(--primary-color);"></i>' +
         t.label + detail + '</div>';
@@ -105,6 +109,9 @@ function completeLastToolStep(container, data) {
         var last = steps[steps.length - 1];
         last.classList.remove('loading');
         last.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:var(--success-color);"></i>';
+        // Remove active state
+        var stepItem = last.closest('.step-item-inline');
+        if (stepItem) stepItem.classList.remove('active');
         // Update step detail from tool_result content
         if (data && data.content) {
             var stepText = last.parentElement.querySelector('.step-text');
