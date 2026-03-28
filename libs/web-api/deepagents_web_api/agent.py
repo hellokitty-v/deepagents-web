@@ -83,7 +83,9 @@ async def get_checkpointer(db_path: str) -> AsyncSqliteSaver:
     global _checkpointer
     if _checkpointer is None:
         _init_sqlite_db(db_path)
-        _checkpointer = AsyncSqliteSaver.from_conn_string(f"sqlite:///{db_path}")
+        import aiosqlite
+        conn = await aiosqlite.connect(db_path)
+        _checkpointer = AsyncSqliteSaver(conn)
         await _checkpointer.setup()
     return _checkpointer
 

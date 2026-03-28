@@ -32,7 +32,7 @@ def _format_sse(event: dict) -> str:
     Returns:
         SSE-formatted string.
     """
-    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+    return f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
 
 
 async def _process_stream_chunks(
@@ -64,17 +64,28 @@ async def _process_stream_chunks(
         namespace, stream_mode, data = chunk
 
         if stream_mode == "messages":
-            if isinstance(data, AIMessage):
+            # data is (message, metadata) tuple in messages mode
+            msg = data[0] if isinstance(data, tuple) else data
+
+            if isinstance(msg, AIMessage):
                 # Emit AI message content
-                if data.content:
-                    yield _format_sse({
-                        "event": "messages",
-                        "data": {"type": "ai", "content": data.content},
-                    })
+                if msg.content:
+                    # content can be string or list of content blocks
+                    text = msg.content
+                    if isinstance(text, list):
+                        text = "".join(
+                            block.get("text", "") if isinstance(block, dict) else str(block)
+                            for block in text
+                        )
+                    if text:
+                        yield _format_sse({
+                            "event": "messages",
+                            "data": {"type": "ai", "content": text},
+                        })
 
                 # Emit tool_calls from AIMessage
-                if data.tool_calls:
-                    for tc in data.tool_calls:
+                if msg.tool_calls:
+                    for tc in msg.tool_calls:
                         yield _format_sse({
                             "event": "tool_calls",
                             "data": {
@@ -84,13 +95,13 @@ async def _process_stream_chunks(
                             },
                         })
 
-            elif isinstance(data, ToolMessage):
+            elif isinstance(msg, ToolMessage):
                 yield _format_sse({
                     "event": "tool_result",
                     "data": {
-                        "tool_call_id": data.tool_call_id,
-                        "tool_name": data.name,
-                        "content": data.content,
+                        "tool_call_id": msg.tool_call_id,
+                        "tool_name": msg.name,
+                        "content": msg.content if isinstance(msg.content, str) else str(msg.content),
                     },
                 })
 

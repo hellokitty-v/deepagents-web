@@ -1,6 +1,6 @@
 /* API 配置 */
 const API_CONFIG = {
-    baseURL: 'http://localhost:8000',
+    baseURL: 'http://localhost:8001',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'
