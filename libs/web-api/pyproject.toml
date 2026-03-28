@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deepagents-web-api"
+version = "0.1.0"
+description = "HTTP REST API wrapper for DeepAgents SDK - enables web frontend to use Agent capabilities through browser."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11,<4.0"
+keywords = ["agents", "ai", "web", "api", "rest", "fastapi", "llm", "langgraph", "langchain", "deep-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Framework :: FastAPI",
+]
+dependencies = [
+    # Core framework
+    "deepagents>=0.5.0",
+    "langchain>=1.2.13,<2.0.0",
+    "langgraph>=1.1.2,<2.0.0",
+    "langgraph-checkpoint-sqlite>=3.0.0,<4.0.0",
+
+    # Web framework
+    "fastapi>=0.100.0,<1.0.0",
+    "uvicorn[standard]>=0.30.0,<1.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+
+    # Async support
+    "aiosqlite>=0.19.0,<1.0.0",
+    "httpx>=0.28.1,<1.0.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<10.0.0",
+    "pytest-asyncio>=0.25.3,<2.0.0",
+    "pytest-cov>=6.0.0,<8.0.0",
+    "pytest-mock>=3.14.0,<4.0.0",
+    "ruff>=0.14.0,<1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/langchain-ai/deepagents"
+Documentation = "https://docs.langchain.com/oss/python/deepagents/overview"
+Repository = "https://github.com/langchain-ai/deepagents"
+Issues = "https://github.com/langchain-ai/deepagents/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["deepagents_web_api"]
+
+[tool.uv.sources]
+deepagents = { path = "../deepagents", editable = true }
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 100
+
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = [
+    "C90",     # McCabe complexity
+    "COM812",  # Messes with the formatter
+    "CPY",     # No copyright
+    "FBT",     # Boolean positional arguments
+    "ISC001",  # Messes with the formatter
+    "PLR09",   # Too many something
+    "SLF001",  # Private member access
+    "TD002",   # Missing author in TODO
+    "TD003",   # Missing issue link in TODO
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "ANN001",   # Missing type annotation
+    "ANN201",   # Missing return type
+    "D1",       # Missing docstrings
+    "S",        # Security warnings
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
