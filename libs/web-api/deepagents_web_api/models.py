@@ -154,10 +154,10 @@ class SessionListItem(BaseModel):
     """
 
     thread_id: str = Field(..., description="Session ID")
-    title: str = Field(..., description="Session title (10-20 chars)")
+    title: str = Field(default="未命名会话", description="Session title (10-20 chars)")
     created_at: str = Field(..., description="Creation timestamp (ISO 8601)")
     updated_at: str = Field(..., description="Last update timestamp (ISO 8601)")
-    message_count: int = Field(..., ge=0, description="Message count")
+    message_count: int = Field(default=0, ge=0, description="Message count")
 
 
 class SessionListResponse(BaseModel):

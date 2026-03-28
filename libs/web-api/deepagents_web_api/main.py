@@ -9,6 +9,8 @@ import io
 import os
 import sqlite3
 import zipfile
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -18,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 
 from .agent import (
+    _init_sqlite_db,
     create_session as create_session_impl,
     delete_session as delete_session_impl,
     download_all_files as download_all_files_impl,
@@ -45,10 +48,18 @@ from .models import (
 from .streaming import stream_agent_response, stream_resume_response
 from .utils import generate_file_id, parse_file_id
 
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """Initialize database on application startup."""
+    _init_sqlite_db("agent_sessions.db")
+    yield
+
+
 app = FastAPI(
     title="DeepAgents Web API",
     description="HTTP REST API wrapper for DeepAgents SDK",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS - allow all origins for development
@@ -159,7 +170,7 @@ async def list_sessions(
         sessions = [
             SessionListItem(
                 thread_id=s["thread_id"],
-                title=s.get("title", "未命名会话"),
+                title=s.get("title") or "未命名会话",
                 created_at=s["created_at"],
                 updated_at=s["updated_at"],
                 message_count=0  # TODO: Calculate from checkpointer
