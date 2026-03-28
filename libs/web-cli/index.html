@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dolphin - 公安智能体平台</title>
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/task.css">
+    <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/search.css">
+    <link rel="stylesheet" href="css/sandbox.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo"><i class="fas fa-dolphin"></i><span>Dolphin</span></div>
+        <nav class="nav-menu">
+            <a href="#" class="nav-item active" onclick="showPage('homePage'); return false;"><i class="fas fa-plus-circle"></i><span>新建任务</span></a>
+            <a href="#" class="nav-item" onclick="showSearch(); return false;"><i class="fas fa-search"></i><span>搜索</span><kbd>Ctrl+K</kbd></a>
+            <a href="#" class="nav-item" onclick="showLibrary(); return false;"><i class="fas fa-folder"></i><span>库</span></a>
+            <a href="#" class="nav-item" onclick="showAllTasks(); return false;"><i class="fas fa-list"></i><span>所有任务</span></a>
+        </nav>
+        <div class="recent-tasks">
+            <div class="section-title">最近任务</div>
+            <div class="task-item" onclick="loadRecentTask('辖区治安周报')"><i class="fas fa-file-powerpoint"></i><span>辖区治安周报</span></div>
+            <div class="task-item" onclick="loadRecentTask('禁毒宣传网站')"><i class="fas fa-globe"></i><span>禁毒宣传网站</span></div>
+            <div class="task-item" onclick="loadRecentTask('发案趋势分析')"><i class="fas fa-chart-bar"></i><span>发案趋势分析</span></div>
+        </div>
+    </aside>
+    <main class="main-content">
+        <!-- 首页 -->
+        <div id="homePage" class="page active">
+            <div class="hero-section">
+                <h1>我能为你做什么？</h1>
+                <div class="task-input-container">
+                    <textarea id="taskInput" class="task-input" placeholder="分配一个任务或提问任何问题"></textarea>
+                    <div class="input-actions">
+                        <div class="input-actions-left">
+                            <button class="btn-icon" title="上传附件"><i class="fas fa-paperclip"></i></button>
+                            <button class="btn-icon" title="语音输入"><i class="fas fa-microphone"></i></button>
+                            <div id="selectedTagChip" class="tag-chip" style="display:none;"></div>
+                        </div>
+                        <button class="btn-primary" onclick="startTask()"><span>开始任务</span><i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+                <div class="task-tags" id="taskTags">
+                    <button class="task-tag" onclick="toggleTaskType('slides',this)"><i class="fas fa-file-powerpoint"></i><span>制作幻灯片</span></button>
+                    <button class="task-tag" onclick="toggleTaskType('website',this)"><i class="fas fa-globe"></i><span>创建网站</span></button>
+                    <button class="task-tag" onclick="toggleTaskType('visualization',this)"><i class="fas fa-chart-bar"></i><span>数据可视化</span></button>
+                </div>
+            </div>
+            <div id="taskTypeDetails" class="task-type-details">
+                <div id="slidesType" class="task-type-content">
+                    <div class="slides-section">
+                        <div class="template-selector">
+                            <h4>选择模板</h4>
+                            <div class="template-grid">
+                                <div class="template-item active" onclick="selectTemplate(this,'公安蓝')">公安蓝</div>
+                                <div class="template-item" onclick="selectTemplate(this,'简约政务')">简约政务</div>
+                                <div class="template-item" onclick="selectTemplate(this,'党建红')">党建红</div>
+                                <div class="template-item" onclick="selectTemplate(this,'科技感')">科技感</div>
+                                <div class="template-item" onclick="selectTemplate(this,'商务蓝')">商务蓝</div>
+                                <div class="template-item" onclick="selectTemplate(this,'清新绿')">清新绿</div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>推荐任务</h3>
+                            <div class="task-examples">
+                                <div class="task-example-card" onclick="fillTask('生成上周辖区治安情况工作汇报PPT，包含警情概述、案件类型分析、重点工作开展情况、下周计划')"><i class="fas fa-shield-alt"></i><h4>辖区治安周报</h4><p>自动搜集治安数据，生成周报 PPT</p></div>
+                                <div class="task-example-card" onclick="fillTask('制作打击电信诈骗专项行动推进会简报，包含工作进展、存在问题、下步措施')"><i class="fas fa-phone-slash"></i><h4>专项行动简报</h4><p>生成专项行动汇报材料</p></div>
+                                <div class="task-example-card" onclick="fillTask('创建派出所年度工作总结演示文稿，包含年度工作亮点、绩效数据、队伍建设')"><i class="fas fa-calendar-check"></i><h4>年度工作总结</h4><p>生成年度总结 PPT</p></div>
+                                <div class="task-example-card" onclick="fillTask('撰写禁毒宣传进校园活动方案PPT，包含目标、受众、内容安排、预期效果')"><i class="fas fa-graduation-cap"></i><h4>禁毒宣传方案</h4><p>生成宣传活动方案</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="websiteType" class="task-type-content">
+                    <h3>推荐任务</h3>
+                    <div class="task-examples">
+                        <div class="task-example-card" onclick="fillTask('创建派出所信息公开网站，包含机构职责、政务公开、便民服务、联系方式')"><i class="fas fa-building"></i><h4>信息公开网站</h4><p>生成信息公开网站原型</p></div>
+                        <div class="task-example-card" onclick="fillTask('制作禁毒宣传专题网站，包含背景介绍、工作动态、成效展示、互动专区')"><i class="fas fa-cannabis"></i><h4>禁毒宣传网站</h4><p>生成禁毒宣传网站</p></div>
+                        <div class="task-example-card" onclick="fillTask('构建辖区安防态势展示平台，包含实时数据、统计图表、分析看板')"><i class="fas fa-video"></i><h4>态势展示平台</h4><p>生成数据展示网站</p></div>
+                        <div class="task-example-card" onclick="fillTask('创建便民服务办事指南网站，包含事项清单、办理流程、所需材料、在线预约')"><i class="fas fa-hands-helping"></i><h4>办事指南网站</h4><p>生成办事指南网站</p></div>
+                    </div>
+                </div>
+                <div id="visualizationType" class="task-type-content">
+                    <div class="visualization-section">
+                        <div class="chart-type-selector">
+                            <h4>选择图表类型</h4>
+                            <div class="chart-type-grid">
+                                <div class="chart-type-item" onclick="selectChartType(this,'柱状图')"><i class="fas fa-chart-bar"></i><span>柱状图</span></div>
+                                <div class="chart-type-item" onclick="selectChartType(this,'折线图')"><i class="fas fa-chart-line"></i><span>折线图</span></div>
+                                <div class="chart-type-item" onclick="selectChartType(this,'饼图')"><i class="fas fa-chart-pie"></i><span>饼图</span></div>
+                                <div class="chart-type-item" onclick="selectChartType(this,'散点图')"><i class="fas fa-braille"></i><span>散点图</span></div>
+                                <div class="chart-type-item" onclick="selectChartType(this,'热力图')"><i class="fas fa-fire"></i><span>热力图</span></div>
+                                <div class="chart-type-item" onclick="selectChartType(this,'雷达图')"><i class="fas fa-chart-area"></i><span>雷达图</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>推荐任务</h3>
+                            <div class="task-examples">
+                                <div class="task-example-card" onclick="fillTask('可视化本月辖区刑事案件发案趋势，使用折线图展示')"><i class="fas fa-chart-line"></i><h4>发案趋势分析</h4><p>生成发案趋势折线图</p></div>
+                                <div class="task-example-card" onclick="fillTask('分析各辖区电诈案件占比，使用饼图展示各辖区分布')"><i class="fas fa-chart-pie"></i><h4>案件占比分析</h4><p>生成电诈案件饼图</p></div>
+                                <div class="task-example-card" onclick="fillTask('对比各派出所警情处置效率，使用柱状图展示关键指标')"><i class="fas fa-chart-bar"></i><h4>绩效对比分析</h4><p>生成处置效率柱状图</p></div>
+                                <div class="task-example-card" onclick="fillTask('绘制辖区警力分布热力图，展示分布密度')"><i class="fas fa-map-marked-alt"></i><h4>警力分布热力图</h4><p>生成警力分布热力图</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 任务执行页 -->
+        <div id="taskPage" class="page">
+            <div class="task-conversation">
+                <div class="conversation-header">
+                    <button class="btn-back" onclick="backToHome()"><i class="fas fa-arrow-left"></i></button>
+                    <div class="header-info">
+                        <h2 id="taskTitle">任务执行中</h2>
+                        <span class="task-status-badge" id="taskStatusBadge"><i class="fas fa-spinner fa-spin"></i><span id="taskStatusText">正在执行</span></span>
+                    </div>
+                    <button class="btn-stop" id="btnStop" onclick="stopTask()"><i class="fas fa-stop"></i><span>停止</span></button>
+                </div>
+                <div class="conversation-main">
+                    <div class="conversation-left">
+                        <div class="conversation-body" id="conversationBody"></div>
+                        <div class="conversation-footer">
+                            <div class="input-container">
+                                <input type="text" id="chatInput" placeholder="发送消息给 Dolphin..." class="chat-input" disabled>
+                                <button class="btn-send" id="btnSend" onclick="sendFollowUp()" disabled><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="conversation-right" id="previewPanel" style="display:none;">
+                        <div class="preview-header">
+                            <div class="preview-tabs" id="previewTabs"></div>
+                            <button class="btn-icon btn-close-preview" onclick="closePreview()"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="preview-body" id="previewBody"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 库页面 -->
+        <div id="libraryPage" class="page">
+            <div class="page-header">
+                <h2>库</h2>
+                <div class="lib-toolbar">
+                    <div class="lib-filters">
+                        <button class="lib-filter active"><i class="fas fa-sliders-h"></i> 全部</button>
+                        <button class="lib-filter"><i class="fas fa-star"></i> 我的收藏</button>
+                    </div>
+                    <div class="lib-actions">
+                        <input type="text" class="search-input" placeholder="搜索文件...">
+                        <button class="btn-icon" title="网格视图"><i class="fas fa-th"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="lib-content" id="libraryContent"></div>
+        </div>
+        <!-- 所有任务页面 -->
+        <div id="allTasksPage" class="page">
+            <div class="page-header"><h2>所有任务</h2></div>
+            <div class="tasks-list" id="tasksList"></div>
+        </div>
+    </main>
+    <script src="js/config.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/sse-client.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/home.js"></script>
+    <script src="js/task-core.js"></script>
+    <script src="js/preview.js"></script>
+    <script src="js/sandbox.js"></script>
+    <script src="js/sandbox-data.js"></script>
+    <script src="js/task-slides.js"></script>
+    <script src="js/task-website.js"></script>
+    <script src="js/task-visualization.js"></script>
+</body>
+</html>

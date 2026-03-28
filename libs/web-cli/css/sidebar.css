@@ -1,0 +1,59 @@
+/* 侧边栏样式 */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-primary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 100;
+}
+.logo {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 22px; font-weight: 700; color: var(--primary-color);
+}
+.logo i {
+    font-size: 28px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.nav-menu {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 16px 12px; border-bottom: 1px solid var(--border-light);
+}
+.nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: var(--border-radius-md);
+    color: var(--text-secondary); text-decoration: none;
+    transition: all var(--transition-base);
+    font-size: 14px; font-weight: 500; cursor: pointer; position: relative;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { background: var(--primary-lighter); color: var(--primary-color); font-weight: 600; }
+.nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 20px; background: var(--primary-color); border-radius: 0 2px 2px 0;
+}
+.nav-item i { font-size: 18px; width: 20px; text-align: center; }
+.nav-item kbd {
+    margin-left: auto; font-size: 11px; padding: 3px 6px;
+    background: var(--bg-tertiary); border-radius: 4px;
+    border: 1px solid var(--border-color);
+    font-family: 'SF Mono', 'Consolas', monospace; color: var(--text-tertiary);
+}
+.recent-tasks { padding: 16px 12px; margin-top: auto; overflow-y: auto; max-height: 300px; }
+.section-title {
+    font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 14px 12px;
+}
+.task-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: var(--border-radius-md);
+    color: var(--text-secondary); font-size: 13px; cursor: pointer;
+    transition: all var(--transition-base); margin-bottom: 2px;
+}
+.task-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.task-item i { font-size: 16px; width: 18px; text-align: center; color: var(--primary-color); }
+.task-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
