@@ -60,6 +60,111 @@ function addTextBlock(container, html) {
     scrollToBottom();
 }
 
+/* 工具调用的图标和描述映射 */
+function getToolDisplay(name, args) {
+    var a = args || {};
+    switch (name) {
+        case 'write_file':
+            return { icon: 'file-pen', label: '写入文件', detail: a.path || '' };
+        case 'read_file':
+            return { icon: 'file-lines', label: '读取文件', detail: a.path || '' };
+        case 'edit_file':
+            return { icon: 'file-pen', label: '编辑文件', detail: a.path || '' };
+        case 'execute':
+            return { icon: 'terminal', label: '执行命令', detail: (a.command || '').substring(0, 60) };
+        case 'task':
+            return { icon: 'users', label: '委派子任务', detail: a.task || '' };
+        case 'glob':
+            return { icon: 'search', label: '搜索文件', detail: a.pattern || '' };
+        case 'grep':
+            return { icon: 'search', label: '搜索内容', detail: a.pattern || '' };
+        case 'ls':
+            return { icon: 'folder-open', label: '列出目录', detail: a.path || '' };
+        case 'write_todos':
+            return { icon: 'list-check', label: '创建任务列表', detail: '' };
+        default:
+            return { icon: 'gear', label: name, detail: '' };
+    }
+}
+
+function addToolStep(container, name, args) {
+    var t = getToolDisplay(name, args);
+    var detail = t.detail ? '<span class="step-detail">' + t.detail + '</span>' : '';
+    var s = document.createElement('div');
+    s.className = 'step-item-inline';
+    s.innerHTML = '<div class="step-icon loading"><i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
+        '<div class="step-text"><i class="fas fa-' + t.icon + '" style="margin-right:6px;color:var(--primary-color);"></i>' +
+        t.label + detail + '</div>';
+    container.appendChild(s);
+    scrollToBottom();
+}
+
+function completeLastToolStep(container, data) {
+    var steps = container.querySelectorAll('.step-item-inline .step-icon.loading');
+    if (steps.length > 0) {
+        var last = steps[steps.length - 1];
+        last.classList.remove('loading');
+        last.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:var(--success-color);"></i>';
+        // Update step detail from tool_result content
+        if (data && data.content) {
+            var stepText = last.parentElement.querySelector('.step-text');
+            if (stepText && !stepText.querySelector('.step-detail')) {
+                var detail = data.content;
+                if (detail.length > 80) detail = detail.substring(0, 80) + '...';
+                stepText.innerHTML += ' <span class="step-detail">' + detail + '</span>';
+            }
+        }
+    }
+}
+
+/* 创建 SSE 回调对象（复用于 startTask / sendFollowUp / resumeTask） */
+function createSSECallbacks(mc, opts) {
+    var o = opts || {};
+    return {
+        onMessage: function(data) {
+            if (data.content) {
+                var block = getOrCreateStreamBlock(mc);
+                block.textContent += data.content;
+                scrollToBottom();
+            }
+        },
+        onToolCall: function(data) {
+            closeStreamBlock(mc);
+            var name = data.tool_name || data.name || 'tool';
+            var args = data.args || {};
+            addToolStep(mc, name, args);
+        },
+        onToolResult: function(data) {
+            closeStreamBlock(mc);
+            completeLastToolStep(mc, data);
+        },
+        onInterrupt: function(data) {
+            showInterruptDialog(mc, data);
+        },
+        onEnd: o.onEnd || function() {},
+        onError: o.onError || function(msg) {
+            addTextBlock(mc, '<span style="color:red;">执行出错: ' + msg + '</span>');
+        },
+        onAbort: o.onAbort || function() {
+            addTextBlock(mc, '<span style="color:orange;">任务已停止</span>');
+        }
+    };
+}
+function getOrCreateStreamBlock(container) {
+    var last = container.querySelector('.agent-text-stream:last-of-type');
+    if (last && !last.dataset.closed) return last;
+    var d = document.createElement('div');
+    d.className = 'agent-text agent-text-stream';
+    container.appendChild(d);
+    scrollToBottom();
+    return d;
+}
+
+function closeStreamBlock(container) {
+    var blocks = container.querySelectorAll('.agent-text-stream');
+    blocks.forEach(function(b) { b.dataset.closed = '1'; });
+}
+
 async function addThinkingBlock(container, text) {
     const s = document.createElement('div');
     s.className = 'thinking-section';
@@ -162,22 +267,7 @@ async function sendFollowUp() {
     const mc = addAgentMessage();
     taskRunning = true;
 
-    await sseClient.runTask(currentThreadId, msg, {
-        onMessage: function(data) {
-            if (data.content) addTextBlock(mc, data.content);
-        },
-        onToolCall: function(data) {
-            const name = data.tool_name || data.name || 'tool';
-            addTextBlock(mc, '<div class="step-item-inline"><div class="step-icon loading">' +
-                '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
-                '<div class="step-text">调用工具: ' + name + '</div></div>');
-        },
-        onToolResult: function(data) {
-            /* tool result handled silently */
-        },
-        onInterrupt: function(data) {
-            showInterruptDialog(mc, data);
-        },
+    await sseClient.runTask(currentThreadId, msg, createSSECallbacks(mc, {
         onEnd: function() {
             taskRunning = false;
             inp.disabled = false;
@@ -188,7 +278,7 @@ async function sendFollowUp() {
             inp.disabled = false;
             document.getElementById('btnSend').disabled = false;
         }
-    });
+    }));
 }
 
 function showInterruptDialog(container, data) {
@@ -216,20 +306,7 @@ async function resumeTask(decision, btn) {
     const mc = addAgentMessage();
     taskRunning = true;
 
-    await sseClient.resumeTask(currentThreadId, [{ type: decision }], {
-        onMessage: function(data) {
-            if (data.content) addTextBlock(mc, data.content);
-        },
-        onToolCall: function(data) {
-            const name = data.tool_name || data.name || 'tool';
-            addTextBlock(mc, '<div class="step-item-inline"><div class="step-icon loading">' +
-                '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
-                '<div class="step-text">调用工具: ' + name + '</div></div>');
-        },
-        onToolResult: function() {},
-        onInterrupt: function(data) {
-            showInterruptDialog(mc, data);
-        },
+    await sseClient.resumeTask(currentThreadId, [{ type: decision }], createSSECallbacks(mc, {
         onEnd: async function() {
             await loadSessionFiles(mc);
             markTaskComplete();
@@ -237,7 +314,7 @@ async function resumeTask(decision, btn) {
         onError: function(msg) {
             addTextBlock(mc, '<span style="color:red;">错误: ' + msg + '</span>');
         }
-    });
+    }));
 }
 
 async function loadSessionFiles(container) {
@@ -295,39 +372,8 @@ async function startTask() {
         currentThreadId = session.thread_id;
 
         const mc = addAgentMessage();
-        addTextBlock(mc, '<div class="step-item-inline"><div class="step-icon loading">' +
-            '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
-            '<div class="step-text">正在分析任务...</div></div>');
 
-        await sseClient.runTask(currentThreadId, val, {
-            onMessage: function(data) {
-                if (data.content) addTextBlock(mc, data.content);
-            },
-            onToolCall: function(data) {
-                var name = data.tool_name || data.name || 'tool';
-                var args = data.args || {};
-                var label = name;
-                if (name === 'write_file' && args.path) label = '写入文件: ' + args.path;
-                else if (name === 'read_file' && args.path) label = '读取文件: ' + args.path;
-                else if (name === 'execute') label = '执行命令';
-                else if (name === 'task') label = '委派子任务';
-
-                addTextBlock(mc, '<div class="step-item-inline"><div class="step-icon loading">' +
-                    '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
-                    '<div class="step-text">' + label + '</div></div>');
-            },
-            onToolResult: function(data) {
-                /* Update last step icon to complete */
-                var steps = mc.querySelectorAll('.step-item-inline .step-icon.loading');
-                if (steps.length > 0) {
-                    var last = steps[steps.length - 1];
-                    last.classList.remove('loading');
-                    last.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:var(--success-color);"></i>';
-                }
-            },
-            onInterrupt: function(data) {
-                showInterruptDialog(mc, data);
-            },
+        await sseClient.runTask(currentThreadId, val, createSSECallbacks(mc, {
             onEnd: async function() {
                 await loadSessionFiles(mc);
                 markTaskComplete();
@@ -340,7 +386,7 @@ async function startTask() {
                 addTextBlock(mc, '<span style="color:orange;">任务已停止</span>');
                 markTaskComplete();
             }
-        });
+        }));
     } catch (err) {
         var mc2 = addAgentMessage();
         addTextBlock(mc2, '<span style="color:red;">无法创建会话: ' + (err.detail || err.message || '未知错误') + '</span>');

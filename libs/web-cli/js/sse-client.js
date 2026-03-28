@@ -31,6 +31,7 @@ class SSEClient {
 
     async _streamRequest(url, body, callbacks) {
         const cb = callbacks || {};
+        this._endReceived = false;
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -79,7 +80,9 @@ class SSEClient {
                 } catch (e) { /* ignore */ }
             }
 
-            if (cb.onEnd) cb.onEnd();
+            // onEnd is dispatched via _dispatch when 'end' event arrives
+            // Only call here if no 'end' event was received (connection closed)
+            if (!this._endReceived && cb.onEnd) cb.onEnd();
         } catch (err) {
             if (err.name === 'AbortError') {
                 if (cb.onAbort) cb.onAbort();
@@ -110,6 +113,7 @@ class SSEClient {
                 if (cb.onUpdate) cb.onUpdate(data);
                 break;
             case 'end':
+                this._endReceived = true;
                 if (cb.onEnd) cb.onEnd();
                 break;
             case 'error':

@@ -67,6 +67,8 @@
 }
 .step-icon.loading { background: var(--warning-color); animation: pulse 2s infinite; }
 .step-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.step-detail { margin-left: 4px; color: var(--text-tertiary, #999); font-size: 12px; font-family: monospace; }
+.agent-text-stream { white-space: pre-wrap; }
 /* 文件标签 */
 .file-section { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; }
 .file-chip {

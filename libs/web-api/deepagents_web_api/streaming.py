@@ -86,6 +86,9 @@ async def _process_stream_chunks(
                 # Emit tool_calls from AIMessage
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
+                        # Skip empty/partial tool calls
+                        if not tc.get("id") or not tc.get("name"):
+                            continue
                         yield _format_sse({
                             "event": "tool_calls",
                             "data": {
@@ -117,12 +120,8 @@ async def _process_stream_chunks(
                 })
                 # Pause stream on interrupt
                 return
-
-            else:
-                yield _format_sse({
-                    "event": "updates",
-                    "data": data,
-                })
+            # Skip middleware internal updates (noisy)
+            # Only __interrupt__ updates are meaningful for the frontend
 
     # Stream completed normally
     yield _format_sse({"event": "end", "data": {}})
