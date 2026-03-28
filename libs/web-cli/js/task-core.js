@@ -108,7 +108,7 @@ function completeLastToolStep(container, data) {
     if (steps.length > 0) {
         var last = steps[steps.length - 1];
         last.classList.remove('loading');
-        last.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:var(--success-color);"></i>';
+        last.innerHTML = '<i class="fas fa-check" style="font-size:8px;"></i>';
         // Remove active state
         var stepItem = last.closest('.step-item-inline');
         if (stepItem) stepItem.classList.remove('active');
