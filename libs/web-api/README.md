@@ -12,6 +12,7 @@ DeepAgents Web API 将 DeepAgents SDK 的 Agent 能力封装为标准的 HTTP RE
 - **流式执行**：通过 Server-Sent Events (SSE) 实时推送 Agent 执行状态
 - **中断恢复**：支持人工审批流程，可中断和恢复 Agent 执行
 - **文件系统隔离**：每个会话独立的文件系统工作区，防止越权访问
+- **文件操作**：列出、下载、预览会话生成的文件，支持批量下载
 - **持久化存储**：基于 SQLite 的会话历史存储，支持断点续传
 
 ## 安装方法
@@ -93,12 +94,22 @@ with httpx.stream("POST", "http://localhost:8000/sessions/my-session/run", json=
 详细的 API 接口文档请访问：http://localhost:8000/docs
 
 主要端点：
-- `POST /sessions` - 创建会话
-- `GET /sessions/{session_id}` - 查询会话
-- `DELETE /sessions/{session_id}` - 删除会话
-- `POST /sessions/{session_id}/run` - 运行 Agent (SSE)
-- `POST /sessions/{session_id}/resume` - 恢复中断的执行
-- `GET /sessions/{session_id}/state` - 获取会话状态
+
+**会话管理**
+- `POST /api/sessions` - 创建会话
+- `GET /api/sessions` - 查询会话列表
+- `GET /api/sessions/{thread_id}/history` - 获取会话历史
+- `DELETE /api/sessions/{thread_id}` - 删除会话
+
+**Agent 执行**
+- `POST /api/sessions/{thread_id}/run` - 运行 Agent (SSE)
+- `POST /api/sessions/{thread_id}/resume` - 恢复中断的执行
+
+**文件操作**
+- `GET /api/sessions/{thread_id}/files` - 列出会话文件
+- `GET /api/files/{file_id}/download` - 下载文件
+- `GET /api/sessions/{thread_id}/download-all` - 批量下载（ZIP）
+- `GET /api/files/{file_id}/preview` - 预览文件（文本/图片/PPTX）
 
 ## 开发指南
 
