@@ -210,35 +210,8 @@ function sandboxOnToolResult(name, data) {
                 renderFileTree();
             }
 
-            setEditorFile(fname);
-
-            // Fetch and display file content
-            if (currentThreadId) {
-                console.log('[Sandbox] Fetching file content for:', fname);
-                fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files')
-                    .then(function(r) { return r.json(); })
-                    .then(function(result) {
-                        console.log('[Sandbox] Files list:', result.files.map(function(f) { return f.name; }));
-                        var file = result.files.find(function(f) { return f.name === fname; });
-                        if (file) {
-                            console.log('[Sandbox] Found file:', file.file_id);
-                            return fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files/' + file.file_id);
-                        } else {
-                            console.warn('[Sandbox] File not found in list:', fname);
-                        }
-                    })
-                    .then(function(r) { return r ? r.text() : null; })
-                    .then(function(text) {
-                        if (text) {
-                            console.log('[Sandbox] Loaded file content, length:', text.length);
-                            var lines = text.split('\n').slice(0, 100).map(function(l) { return { text: l }; });
-                            setEditorContent(lines);
-                        }
-                    })
-                    .catch(function(e) { console.error('[Sandbox] Failed to load file:', e); });
-            } else {
-                console.warn('[Sandbox] No currentThreadId available');
-            }
+            // Load and display file content
+            loadFileContent(fname);
         }
     } else if (name === 'read_file') {
         // Show read content in editor
@@ -256,6 +229,40 @@ function sandboxOnEnd() {
         setSandboxStatus('已完成', false);
         setSandboxProgress(_sandboxStepCount, _sandboxStepCount, '全部完成');
     }
+}
+
+/* Load and display file content by filename */
+function loadFileContent(filename) {
+    if (!currentThreadId) {
+        console.warn('[Sandbox] No currentThreadId available');
+        return;
+    }
+
+    console.log('[Sandbox] Loading file:', filename);
+    setEditorFile(filename);
+
+    fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files')
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            var file = result.files.find(function(f) { return f.name === filename; });
+            if (file) {
+                console.log('[Sandbox] Found file:', file.file_id);
+                return fetch(apiClient.baseURL + '/api/files/' + file.file_id + '/download');
+            } else {
+                console.warn('[Sandbox] File not found:', filename);
+                throw new Error('File not found');
+            }
+        })
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+            console.log('[Sandbox] Loaded file content, length:', text.length);
+            var lines = text.split('\n').slice(0, 100).map(function(l) { return { text: l }; });
+            setEditorContent(lines);
+        })
+        .catch(function(e) {
+            console.error('[Sandbox] Failed to load file:', e);
+            setEditorContent([{ text: '// 加载文件失败: ' + e.message }]);
+        });
 }
 
 /* 创建 SSE 回调对象（复用于 startTask / sendFollowUp / resumeTask） */

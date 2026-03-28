@@ -96,8 +96,18 @@ function renderFileTree() {
         const cls = 'filetree-item' + (f.indent ? ' indent-' + f.indent : '') +
             (f.dir ? ' dir' : '') + (f.name === sandboxState.currentFile ? ' active' : '');
         const icon = f.dir ? 'folder' : (f.icon || 'file');
-        return '<div class="' + cls + '"><i class="fas fa-' + icon + '"></i><span>' + f.name + '</span></div>';
+        return '<div class="' + cls + '" data-filename="' + f.name + '"><i class="fas fa-' + icon + '"></i><span>' + f.name + '</span></div>';
     }).join('');
+
+    // Add click handlers for file items
+    tree.querySelectorAll('.filetree-item:not(.dir)').forEach(function(item) {
+        item.addEventListener('click', function() {
+            const filename = this.getAttribute('data-filename');
+            if (filename) {
+                loadFileContent(filename);
+            }
+        });
+    });
 }
 
 function setEditorFile(filename, icon) {
