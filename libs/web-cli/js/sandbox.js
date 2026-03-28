@@ -103,8 +103,11 @@ function renderFileTree() {
     tree.querySelectorAll('.filetree-item:not(.dir)').forEach(function(item) {
         item.addEventListener('click', function() {
             const filename = this.getAttribute('data-filename');
-            if (filename) {
+            console.log('[FileTree] Clicked file:', filename);
+            if (filename && typeof loadFileContent === 'function') {
                 loadFileContent(filename);
+            } else {
+                console.error('[FileTree] loadFileContent not available or filename missing');
             }
         });
     });

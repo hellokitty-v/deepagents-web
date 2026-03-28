@@ -129,7 +129,7 @@
 .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 预览面板 */
 .conversation-right {
-    width: 520px; border-left: 1px solid var(--border-color); background: var(--bg-primary);
+    width: 700px; border-left: 1px solid var(--border-color); background: var(--bg-primary);
     display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
 }
 .preview-header {
