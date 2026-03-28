@@ -92,7 +92,7 @@ function addToolStep(container, name, args) {
     var detail = t.detail ? '<span class="step-detail">' + t.detail + '</span>' : '';
     var s = document.createElement('div');
     s.className = 'step-item-inline';
-    s.innerHTML = '<div class="step-icon loading"><i class="fas fa-spinner fa-spin" style="font-size:10px"></i></div>' +
+    s.innerHTML = '<div class="step-icon loading"></div>' +
         '<div class="step-text"><i class="fas fa-' + t.icon + '" style="margin-right:6px;color:var(--primary-color);"></i>' +
         t.label + detail + '</div>';
     container.appendChild(s);
@@ -117,6 +117,93 @@ function completeLastToolStep(container, data) {
     }
 }
 
+/* 沙箱预览集成：根据工具调用更新右侧沙箱面板 */
+var _sandboxOpened = false;
+var _sandboxStepCount = 0;
+var _sandboxFiles = [];
+
+function initSandboxForTask() {
+    _sandboxOpened = false;
+    _sandboxStepCount = 0;
+    _sandboxFiles = [];
+}
+
+function ensureSandboxOpen() {
+    if (!_sandboxOpened) {
+        openSandbox();
+        setSandboxToolbar([
+            { id: 'editor', icon: 'code', label: '编辑器' },
+            { id: 'terminal', icon: 'terminal', label: '终端' },
+            { id: 'preview', icon: 'eye', label: '预览' }
+        ], 'editor');
+        setSandboxStatus('运行中', true);
+        showEditorView();
+        _sandboxOpened = true;
+    }
+}
+
+function sandboxOnToolCall(name, args) {
+    ensureSandboxOpen();
+    _sandboxStepCount++;
+
+    if (name === 'execute') {
+        switchSandboxView('terminal');
+        var cmd = (args && args.command) || name;
+        addTerminalLine('cmd', cmd);
+    } else if (name === 'write_file' || name === 'edit_file' || name === 'read_file') {
+        switchSandboxView('editor');
+        var path = (args && (args.path || args.file_path)) || '';
+        if (path) {
+            var fname = path.split('/').pop();
+            var ext = fname.split('.').pop();
+            var iconMap = { py: 'file-code', js: 'file-code', html: 'file-code', css: 'file-code',
+                           md: 'file-alt', txt: 'file-alt', pptx: 'file-powerpoint' };
+            setEditorFile(fname, iconMap[ext] || 'file-code');
+
+            // Add to file tree if new
+            if (!_sandboxFiles.find(function(f) { return f.name === fname; })) {
+                _sandboxFiles.push({ name: fname, icon: iconMap[ext] || 'file' });
+                sandboxState.files = _sandboxFiles;
+                renderFileTree();
+            }
+        }
+    }
+
+    setSandboxProgress(_sandboxStepCount, _sandboxStepCount + 2, '步骤 ' + _sandboxStepCount);
+}
+
+function sandboxOnToolResult(name, data) {
+    if (!_sandboxOpened) return;
+
+    var content = (data && data.content) || '';
+
+    if (name === 'execute') {
+        // Show command output in terminal
+        if (content) addTerminalLine('output', escHtml(content));
+    } else if (name === 'write_file' || name === 'edit_file') {
+        // Show file content in editor if available
+        if (data && data.args && data.args.content) {
+            var lines = data.args.content.split('\n').map(function(l) { return { text: l }; });
+            setEditorContent(lines);
+        }
+    } else if (name === 'read_file') {
+        // Show read content in editor
+        if (content) {
+            var lines = content.split('\n').map(function(l) { return { text: l }; });
+            setEditorContent(lines);
+        }
+    }
+
+    setSandboxProgress(_sandboxStepCount, _sandboxStepCount + 1, '步骤 ' + _sandboxStepCount + ' 完成');
+}
+
+function sandboxOnEnd() {
+    if (_sandboxOpened) {
+        setSandboxStatus('已完成', false);
+        setSandboxProgress(_sandboxStepCount, _sandboxStepCount, '全部完成');
+    }
+}
+
 /* 创建 SSE 回调对象（复用于 startTask / sendFollowUp / resumeTask） */
 function createSSECallbacks(mc, opts) {
     var o = opts || {};
@@ -133,19 +220,28 @@ function createSSECallbacks(mc, opts) {
             var name = data.tool_name || data.name || 'tool';
             var args = data.args || {};
             addToolStep(mc, name, args);
+            sandboxOnToolCall(name, args);
         },
         onToolResult: function(data) {
             closeStreamBlock(mc);
             completeLastToolStep(mc, data);
+            var name = data.tool_name || data.name || '';
+            sandboxOnToolResult(name, data);
         },
         onInterrupt: function(data) {
             showInterruptDialog(mc, data);
         },
-        onEnd: o.onEnd || function() {},
+        onEnd: function() {
+            closeStreamBlock(mc);
+            sandboxOnEnd();
+            if (o.onEnd) o.onEnd();
+        },
         onError: o.onError || function(msg) {
+            closeStreamBlock(mc);
             addTextBlock(mc, '<span style="color:red;">执行出错: ' + msg + '</span>');
         },
         onAbort: o.onAbort || function() {
+            closeStreamBlock(mc);
             addTextBlock(mc, '<span style="color:orange;">任务已停止</span>');
         }
     };
@@ -162,7 +258,17 @@ function getOrCreateStreamBlock(container) {
 
 function closeStreamBlock(container) {
     var blocks = container.querySelectorAll('.agent-text-stream');
-    blocks.forEach(function(b) { b.dataset.closed = '1'; });
+    blocks.forEach(function(b) {
+        if (!b.dataset.closed) {
+            b.dataset.closed = '1';
+            // Render accumulated text as Markdown
+            var raw = b.textContent;
+            if (raw && typeof marked !== 'undefined') {
+                b.innerHTML = marked.parse(raw);
+                b.classList.add('markdown-body');
+            }
+        }
+    });
 }
 
 async function addThinkingBlock(container, text) {
@@ -364,6 +470,7 @@ async function startTask() {
     document.getElementById('btnStop').style.display = 'flex';
     document.getElementById('chatInput').disabled = true;
     document.getElementById('btnSend').disabled = true;
+    initSandboxForTask();
     addUserMessage(val);
 
     /* 创建会话并执行任务 */
