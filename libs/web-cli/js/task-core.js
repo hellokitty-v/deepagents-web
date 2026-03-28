@@ -153,10 +153,10 @@ function sandboxOnToolCall(name, args) {
     ensureSandboxOpen();
     _sandboxStepCount++;
 
-    if (name === 'execute') {
+    if (name === 'execute' || name === 'bash' || name === 'shell_exec') {
         switchSandboxView('terminal');
-        var cmd = (args && args.command) || name;
-        addTerminalLine('cmd', cmd);
+        var cmd = (args && args.command) || (args && args.cmd) || name;
+        addTerminalLine('cmd', '$ ' + cmd);
     } else if (name === 'write_file' || name === 'edit_file' || name === 'read_file') {
         switchSandboxView('editor');
         var path = (args && (args.path || args.file_path)) || '';
@@ -164,7 +164,7 @@ function sandboxOnToolCall(name, args) {
             var fname = path.split('/').pop();
             var ext = fname.split('.').pop();
             var iconMap = { py: 'file-code', js: 'file-code', html: 'file-code', css: 'file-code',
-                           md: 'file-alt', txt: 'file-alt', pptx: 'file-powerpoint' };
+                           md: 'file-alt', txt: 'file-alt', json: 'file-code', pptx: 'file-powerpoint' };
             setEditorFile(fname, iconMap[ext] || 'file-code');
 
             // Add to file tree if new
@@ -172,6 +172,12 @@ function sandboxOnToolCall(name, args) {
                 _sandboxFiles.push({ name: fname, icon: iconMap[ext] || 'file' });
                 sandboxState.files = _sandboxFiles;
                 renderFileTree();
+            }
+
+            // Show file content immediately if available in args
+            if (name === 'write_file' && args && args.content) {
+                var lines = args.content.split('\n').slice(0, 100).map(function(l) { return { text: l }; });
+                setEditorContent(lines);
             }
         }
     }
@@ -184,19 +190,60 @@ function sandboxOnToolResult(name, data) {
 
     var content = (data && data.content) || '';
 
-    if (name === 'execute') {
+    if (name === 'execute' || name === 'bash' || name === 'shell_exec') {
         // Show command output in terminal
         if (content) addTerminalLine('output', escHtml(content));
     } else if (name === 'write_file' || name === 'edit_file') {
-        // Show file content in editor if available
-        if (data && data.args && data.args.content) {
-            var lines = data.args.content.split('\n').map(function(l) { return { text: l }; });
-            setEditorContent(lines);
+        // Extract file path from result message (e.g., "Updated file /index.html")
+        var pathMatch = content.match(/file\s+(\/[^\s]+)/i);
+        if (pathMatch) {
+            var filePath = pathMatch[1];
+            var fname = filePath.split('/').pop();
+
+            // Update file tree
+            if (!_sandboxFiles.find(function(f) { return f.name === fname; })) {
+                var ext = fname.split('.').pop();
+                var iconMap = { py: 'file-code', js: 'file-code', html: 'file-code', css: 'file-code',
+                               md: 'file-alt', txt: 'file-alt', json: 'file-code', pptx: 'file-powerpoint' };
+                _sandboxFiles.push({ name: fname, icon: iconMap[ext] || 'file' });
+                sandboxState.files = _sandboxFiles;
+                renderFileTree();
+            }
+
+            setEditorFile(fname);
+
+            // Fetch and display file content
+            if (currentThreadId) {
+                console.log('[Sandbox] Fetching file content for:', fname);
+                fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files')
+                    .then(function(r) { return r.json(); })
+                    .then(function(result) {
+                        console.log('[Sandbox] Files list:', result.files.map(function(f) { return f.name; }));
+                        var file = result.files.find(function(f) { return f.name === fname; });
+                        if (file) {
+                            console.log('[Sandbox] Found file:', file.file_id);
+                            return fetch(apiClient.baseURL + '/api/sessions/' + currentThreadId + '/files/' + file.file_id);
+                        } else {
+                            console.warn('[Sandbox] File not found in list:', fname);
+                        }
+                    })
+                    .then(function(r) { return r ? r.text() : null; })
+                    .then(function(text) {
+                        if (text) {
+                            console.log('[Sandbox] Loaded file content, length:', text.length);
+                            var lines = text.split('\n').slice(0, 100).map(function(l) { return { text: l }; });
+                            setEditorContent(lines);
+                        }
+                    })
+                    .catch(function(e) { console.error('[Sandbox] Failed to load file:', e); });
+            } else {
+                console.warn('[Sandbox] No currentThreadId available');
+            }
         }
     } else if (name === 'read_file') {
         // Show read content in editor
         if (content) {
-            var lines = content.split('\n').map(function(l) { return { text: l }; });
+            var lines = content.split('\n').slice(0, 100).map(function(l) { return { text: l }; });
             setEditorContent(lines);
         }
     }
