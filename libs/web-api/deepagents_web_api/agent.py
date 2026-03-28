@@ -438,3 +438,296 @@ async def generate_session_title(
 
         return default_title
 
+
+# ============================================================================
+# File Operations
+# ============================================================================
+
+async def list_session_files(
+    thread_id: str,
+    db_path: str = "agent_sessions.db",
+) -> dict[str, Any]:
+    """List all files in session workspace.
+
+    Args:
+        thread_id: Session identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        Dictionary with thread_id and list of file metadata.
+
+    Raises:
+        HTTPException: If session not found.
+    """
+    from fastapi import HTTPException
+    from .utils import generate_file_id
+
+    # Verify session exists and get workspace path
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "SELECT workspace_path FROM sessions WHERE thread_id = ?",
+            (thread_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Session not found")
+        workspace_path = row[0]
+    finally:
+        conn.close()
+
+    # List all files in workspace
+    files = []
+    workspace = Path(workspace_path)
+    if workspace.exists():
+        for file_path in workspace.rglob("*"):
+            if file_path.is_file():
+                rel_path = file_path.relative_to(workspace)
+                stat = file_path.stat()
+                files.append({
+                    "file_id": generate_file_id(thread_id, str(rel_path)),
+                    "name": file_path.name,
+                    "path": str(rel_path),
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(
+                        stat.st_ctime, tz=timezone.utc
+                    ).isoformat(),
+                })
+
+    return {
+        "thread_id": thread_id,
+        "files": files,
+    }
+
+
+async def download_file(
+    file_id: str,
+    db_path: str = "agent_sessions.db",
+):
+    """Download a specific file.
+
+    Args:
+        file_id: Encoded file identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        FileResponse for the requested file.
+
+    Raises:
+        HTTPException: If file_id invalid, file not found, or path unsafe.
+    """
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+    from .utils import parse_file_id
+
+    # Parse file_id
+    try:
+        thread_id, file_path = parse_file_id(file_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid file_id format")
+
+    # Security: prevent path traversal
+    normalized = os.path.normpath(file_path)
+    if normalized.startswith("..") or os.path.isabs(normalized):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # Get workspace path
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "SELECT workspace_path FROM sessions WHERE thread_id = ?",
+            (thread_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Session not found")
+        workspace_path = row[0]
+    finally:
+        conn.close()
+
+    # Check file exists
+    full_path = os.path.join(workspace_path, file_path)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=full_path,
+        filename=os.path.basename(file_path),
+    )
+
+
+async def download_all_files(
+    thread_id: str,
+    db_path: str = "agent_sessions.db",
+):
+    """Download all files in session workspace as ZIP.
+
+    Args:
+        thread_id: Session identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        StreamingResponse with ZIP file.
+
+    Raises:
+        HTTPException: If session not found.
+    """
+    import io
+    import zipfile
+    from fastapi import HTTPException
+    from fastapi.responses import StreamingResponse
+
+    # Verify session exists and get workspace path
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "SELECT workspace_path FROM sessions WHERE thread_id = ?",
+            (thread_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Session not found")
+        workspace_path = row[0]
+    finally:
+        conn.close()
+
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        workspace = Path(workspace_path)
+        if workspace.exists():
+            for file_path in workspace.rglob("*"):
+                if file_path.is_file():
+                    rel_path = file_path.relative_to(workspace)
+                    zip_file.write(file_path, arcname=rel_path)
+
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename={thread_id}_files.zip"
+        }
+    )
+
+
+async def preview_file(
+    file_id: str,
+    db_path: str = "agent_sessions.db",
+) -> dict[str, Any]:
+    """Preview file content.
+
+    Args:
+        file_id: Encoded file identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        Dictionary with file preview data.
+
+    Raises:
+        HTTPException: If file not found or format unsupported.
+    """
+    import base64
+    from fastapi import HTTPException
+    from .utils import parse_file_id
+
+    # Parse file_id
+    try:
+        thread_id, file_path = parse_file_id(file_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid file_id format")
+
+    # Security: prevent path traversal
+    normalized = os.path.normpath(file_path)
+    if normalized.startswith("..") or os.path.isabs(normalized):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # Get workspace path
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "SELECT workspace_path FROM sessions WHERE thread_id = ?",
+            (thread_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Session not found")
+        workspace_path = row[0]
+    finally:
+        conn.close()
+
+    # Check file exists
+    full_path = os.path.join(workspace_path, file_path)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Determine file type and generate preview
+    ext = Path(file_path).suffix.lower()
+
+    # Text files
+    text_exts = {'.txt', '.md', '.py', '.json', '.yaml', '.yml',
+                 '.xml', '.html', '.css', '.js'}
+    if ext in text_exts:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return {
+            "file_id": file_id,
+            "type": "text",
+            "content": content,
+        }
+
+    # Image files
+    image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg'}
+    if ext in image_exts:
+        with open(full_path, 'rb') as f:
+            image_data = f.read()
+        content_b64 = base64.b64encode(image_data).decode('ascii')
+        mime_type = f"image/{ext[1:]}"
+        if ext == '.jpg':
+            mime_type = "image/jpeg"
+        elif ext == '.svg':
+            mime_type = "image/svg+xml"
+        return {
+            "file_id": file_id,
+            "type": "image",
+            "content": content_b64,
+            "mime_type": mime_type,
+        }
+
+    # PPTX files
+    if ext == '.pptx':
+        try:
+            from pptx import Presentation
+            from PIL import Image
+            import io
+
+            prs = Presentation(full_path)
+            thumbnails = []
+
+            for slide_idx, slide in enumerate(prs.slides):
+                # Create a simple thumbnail (placeholder implementation)
+                # In production, you'd render the slide properly
+                img = Image.new('RGB', (320, 240), color='white')
+                buffer = io.BytesIO()
+                img.save(buffer, format='PNG')
+                buffer.seek(0)
+                thumb_b64 = base64.b64encode(buffer.read()).decode('ascii')
+                thumbnails.append(thumb_b64)
+
+            return {
+                "file_id": file_id,
+                "type": "pptx",
+                "thumbnails": thumbnails,
+            }
+        except ImportError:
+            raise HTTPException(
+                status_code=415,
+                detail="PPTX preview requires python-pptx and Pillow"
+            )
+
+    # Unsupported format
+    raise HTTPException(
+        status_code=415,
+        detail=f"Preview not supported for {ext} files"
+    )
+

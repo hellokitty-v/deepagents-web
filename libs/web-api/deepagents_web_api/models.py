@@ -233,3 +233,57 @@ class DeleteResponse(BaseModel):
     success: bool = Field(..., description="Deletion success status")
     message: str = Field(..., description="Success or error message")
 
+
+# ============================================================================
+# File Operation Models
+# ============================================================================
+
+
+class FileItem(BaseModel):
+    """File item in file list response.
+
+    Attributes:
+        file_id: Encoded file identifier.
+        name: File name.
+        path: Relative path within workspace.
+        size: File size in bytes.
+        created_at: File creation timestamp.
+    """
+
+    file_id: str = Field(..., description="Encoded file identifier")
+    name: str = Field(..., description="File name")
+    path: str = Field(..., description="Relative path within workspace")
+    size: int = Field(..., ge=0, description="File size in bytes")
+    created_at: str = Field(..., description="Creation timestamp (ISO 8601)")
+
+
+class FileListResponse(BaseModel):
+    """Response model for file list query.
+
+    Attributes:
+        thread_id: Session ID.
+        files: List of files in workspace.
+    """
+
+    thread_id: str = Field(..., description="Session ID")
+    files: list[FileItem] = Field(..., description="File list")
+
+
+class FilePreviewResponse(BaseModel):
+    """Response model for file preview.
+
+    Attributes:
+        file_id: Encoded file identifier.
+        type: File type (text/image/pptx/unsupported).
+        content: File content (text or base64 for images).
+        mime_type: MIME type (for images).
+        thumbnails: List of base64 thumbnails (for PPTX).
+    """
+
+    file_id: str = Field(..., description="Encoded file identifier")
+    type: str = Field(..., description="File type")
+    content: Optional[str] = Field(default=None, description="File content")
+    mime_type: Optional[str] = Field(default=None, description="MIME type")
+    thumbnails: Optional[list[str]] = Field(default=None, description="Thumbnails")
+
+

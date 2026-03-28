@@ -4,31 +4,46 @@ This module defines the main FastAPI application and routes for the
 DeepAgents Web API service.
 """
 
+import base64
+import io
+import os
+import sqlite3
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from .agent import (
     create_session as create_session_impl,
     delete_session as delete_session_impl,
+    download_all_files as download_all_files_impl,
+    download_file as download_file_impl,
     generate_session_title,
     get_agent,
     get_session_history as get_session_history_impl,
+    list_session_files as list_session_files_impl,
     list_sessions as list_sessions_impl,
+    preview_file as preview_file_impl,
 )
 from .models import (
     AgentRunRequest,
     DeleteResponse,
+    FileListResponse,
+    FilePreviewResponse,
     ResumeRequest,
     SessionCreateRequest,
     SessionCreateResponse,
     SessionHistoryResponse,
     SessionListItem,
     SessionListResponse,
+    FileItem,
 )
 from .streaming import stream_agent_response, stream_resume_response
+from .utils import generate_file_id, parse_file_id
 
 app = FastAPI(
     title="DeepAgents Web API",
@@ -310,8 +325,152 @@ async def delete_session(thread_id: str) -> DeleteResponse:
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 
 
+# ============================================================================
+# API-007: Get File List
+# ============================================================================
+
+
+@app.get("/api/sessions/{thread_id}/files", response_model=FileListResponse)
+async def list_files(
+    thread_id: str,
+    db_path: str = "agent_sessions.db",
+) -> FileListResponse:
+    """Get list of files in session workspace.
+
+    Args:
+        thread_id: Session ID.
+        db_path: Path to SQLite database.
+
+    Returns:
+        FileListResponse: List of files with metadata.
+
+    Raises:
+        HTTPException: 404 if session not found,
+            500 if file system access fails.
+    """
+    try:
+        result = await list_session_files_impl(thread_id, db_path)
+        return FileListResponse(
+            thread_id=result["thread_id"],
+            files=[FileItem(**f) for f in result["files"]]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list files: {str(e)}"
+        )
+
+
+# ============================================================================
+# API-008: Download File
+# ============================================================================
+
+
+@app.get("/api/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    db_path: str = "agent_sessions.db",
+) -> FileResponse:
+    """Download a file from session workspace.
+
+    Args:
+        file_id: Encoded file identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        FileResponse: File stream with proper headers.
+
+    Raises:
+        HTTPException: 400 if file_id is invalid,
+            404 if session or file not found,
+            500 if file access fails.
+    """
+    try:
+        return await download_file_impl(file_id, db_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to download file: {str(e)}"
+        )
+
+
+# ============================================================================
+# API-009: Download All Files (ZIP)
+# ============================================================================
+
+
+@app.get("/api/sessions/{thread_id}/download-all")
+async def download_all_files(
+    thread_id: str,
+    db_path: str = "agent_sessions.db",
+) -> StreamingResponse:
+    """Download all files in session workspace as ZIP.
+
+    Args:
+        thread_id: Session ID.
+        db_path: Path to SQLite database.
+
+    Returns:
+        StreamingResponse: ZIP file stream.
+
+    Raises:
+        HTTPException: 404 if session not found,
+            500 if ZIP creation fails.
+    """
+    try:
+        return await download_all_files_impl(thread_id, db_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create ZIP: {str(e)}"
+        )
+
+
+# ============================================================================
+# API-011: Preview File
+# ============================================================================
+
+
+@app.get("/api/files/{file_id}/preview", response_model=FilePreviewResponse)
+async def preview_file(
+    file_id: str,
+    db_path: str = "agent_sessions.db",
+) -> FilePreviewResponse:
+    """Preview file content (text, image, or PPTX).
+
+    Args:
+        file_id: Encoded file identifier.
+        db_path: Path to SQLite database.
+
+    Returns:
+        FilePreviewResponse: File preview data based on type.
+
+    Raises:
+        HTTPException: 400 if file_id is invalid,
+            404 if session or file not found,
+            415 if file type is not supported,
+            500 if preview generation fails.
+    """
+    try:
+        result = await preview_file_impl(file_id, db_path)
+        return FilePreviewResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to preview file: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
 
