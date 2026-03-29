@@ -80,15 +80,40 @@ async function loadSessionHistory(threadId) {
         const history = await apiClient.getSessionHistory(threadId);
         document.getElementById('taskTitle').textContent = history.title || '历史会话';
 
+        // Initialize sandbox for history replay
+        initSandboxForTask();
+
         if (history.messages) {
+            let currentAgentMessage = null;
+
             history.messages.forEach(msg => {
                 if (msg.type === 'human') {
                     addUserMessage(msg.content);
-                } else if (msg.type === 'ai' && msg.content) {
-                    const mc = addAgentMessage();
-                    addTextBlock(mc, msg.content);
+                    currentAgentMessage = null;
+                } else if (msg.type === 'ai') {
+                    currentAgentMessage = addAgentMessage();
+
+                    // Render AI text content
+                    if (msg.content) {
+                        addTextBlock(currentAgentMessage, msg.content);
+                    }
+
+                    // Render tool calls
+                    if (msg.tool_calls && msg.tool_calls.length > 0) {
+                        msg.tool_calls.forEach(tc => {
+                            addToolStep(currentAgentMessage, tc.name, tc.args);
+                            sandboxOnToolCall(tc.name, tc.args);
+                        });
+                    }
+                } else if (msg.type === 'tool' && currentAgentMessage) {
+                    // Complete the tool step and update sandbox
+                    completeLastToolStep(currentAgentMessage, msg);
+                    sandboxOnToolResult(msg.tool_name, msg);
                 }
             });
+
+            // Mark sandbox as complete
+            sandboxOnEnd();
         }
     } catch (e) {
         console.warn('Failed to load session history:', e);
