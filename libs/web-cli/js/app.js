@@ -83,37 +83,9 @@ async function loadSessionHistory(threadId) {
         // Initialize sandbox for history replay
         initSandboxForTask();
 
+        // Render messages using shared logic
         if (history.messages) {
-            let currentAgentMessage = null;
-
-            history.messages.forEach(msg => {
-                if (msg.type === 'human') {
-                    addUserMessage(msg.content);
-                    currentAgentMessage = null;
-                } else if (msg.type === 'ai') {
-                    currentAgentMessage = addAgentMessage();
-
-                    // Render AI text content
-                    if (msg.content) {
-                        addTextBlock(currentAgentMessage, msg.content);
-                    }
-
-                    // Render tool calls
-                    if (msg.tool_calls && msg.tool_calls.length > 0) {
-                        msg.tool_calls.forEach(tc => {
-                            addToolStep(currentAgentMessage, tc.name, tc.args);
-                            sandboxOnToolCall(tc.name, tc.args);
-                        });
-                    }
-                } else if (msg.type === 'tool' && currentAgentMessage) {
-                    // Complete the tool step and update sandbox
-                    completeLastToolStep(currentAgentMessage, msg);
-                    sandboxOnToolResult(msg.tool_name, msg);
-                }
-            });
-
-            // Mark sandbox as complete
-            sandboxOnEnd();
+            renderMessagesFromHistory(history.messages);
         }
     } catch (e) {
         console.warn('Failed to load session history:', e);
